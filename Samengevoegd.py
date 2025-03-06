@@ -7,10 +7,13 @@ import plotly.graph_objects as go
 import streamlit as st
 import folium
 from streamlit_folium import st_folium
+import time
+import matplotlib.pyplot as plt
 
 
 # Streamlit titel
 st.title("✈️ Schiphol Vluchtdata Dashboard")
+st.text('Dit is de app van groep 4 in streamit')
 
 # API URL en headers
 API_URL = "https://api.schiphol.nl/public-flights/flights?includedelays=false&page={}&sort=%2BscheduleTime"
@@ -106,6 +109,215 @@ if 'pier' in df.columns:
                       title="Verdeling Vluchten per Pier", color_discrete_sequence=px.colors.qualitative.Set3)
     st.plotly_chart(fig_pier)
 
+pd.set_option('display.max.columns',None) #Alle kollommen worden hierdoor weergegeven
+#Alle benodigde functies definiëren met def
+# Voorbeeld
+# def stats(dataframe): 
+#     st.header('Data Statistics')
+#     st.write(dataframe.describe())
+def stats(dataframe): 
+    st.header('Data statistieken')
+    st.write(dataframe.describe())
+
+def data_header(dataframe):
+    st.header('Data Header')
+    st.write(dataframe.head(100))
+
+def data(dataframe): 
+    st.header('Dataframe')
+    st.dataframe()
+
+def interactive_plot(dataframe):
+    x_axis_val= st.selectbox('Select X-Axis Value', options=df.columns)
+    y_axis_val= st.selectbox('Select Y-Axis Value', options=df.columns)
+    col= st.color_picker('Select a plot colour')
+
+    plot= px.scatter(dataframe, x=x_axis_val, y=y_axis_val)
+    plot.update_traces(marker=dict(color=col))
+    st.plotly_chart(plot)
+
+# def continent_plot(dataframe):
+def continent_plot(dataframe): 
+    st.plotly_chart(fig)
+
+
+#Invoegen van de sidebar gebeurt met deze regel
+st.sidebar.title('Verkeersleiding')
+
+# Een lege lijst om alle vluchtdata op te slaan
+all_flights_data = []
+@st.cache_data(ttl=600)
+def bagger():
+    # Loop over de pagina's (0 tot 29, dus 30 pagina's)
+    for page in range(50):
+        # Stel de volledige URL samen met de pagina
+        page_url = url.format(page)
+        
+        # Haal de gegevens op van de API
+        response = requests.get(page_url, headers=headers)
+        data = response.json()  # Verkrijg de JSON reactie
+
+        # all_flights_data.extend(data['flights']) 
+        time.sleep(1)
+        # Haal de 'flights' lijst op uit de response
+        flights_data = data.get('flights', [])
+        
+        
+        # Voeg de gegevens toe aan de lijst
+        all_flights_data.extend(flights_data)
+       
+df= bagger()  
+# Normaliseer de vluchtgegevens naar een DataFrame
+df = pd.json_normalize(all_flights_data)
+
+
+df.to_csv("Schiphol.csv", index=False, decimal=',')
+
+url = "https://api.schiphol.nl/public-flights/flights?includedelays=false&page=0&sort=%2BscheduleTime"
+headers = {
+    "app_id": "dbd8eca8",
+    "app_key": "42c284624e47e194b2600191b939ad5b",
+    'ResourceVersion': 'v4'
+}
+
+response = requests.get(url, headers=headers)
+data = response.json()  # Get the response as a JSON object
+
+# Extract the 'flights' list from the response
+flights_data = data.get('flights', [])
+
+# Normalize the 'flights' list into a DataFrame
+df = pd.json_normalize(flights_data)
+
+#Datamanipulatie
+continents= ["North-America", "South-America", "Europe", "Asia", "Australia", "Africa"]
+url2 = "https://nl.wikipedia.org/wiki/Vliegvelden_gesorteerd_naar_IATA-code"
+# Haal alle tabellen van de pagina
+tables = pd.read_html(url2)
+
+# Selecteer de juiste tabel (meestal de eerste echte tabel, dus tables[1])
+vliegvelden = tables[1]  # tables[0] lijkt metadata te zijn, echte tabel is tables[1]
+
+# Bekijk de eerste paar rijen
+vliegvelden.head()
+
+# Zet de lijstkolom om naar een stringkolom door het eerste element te selecteren:
+df['route.destinations'] = df['route.destinations'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else None)
+# Verwijder dubbele IATA-codes en behoud alleen de laatste instantie
+vliegvelden_clean = vliegvelden.drop_duplicates(subset='IATA', keep='last')
+# Maak een mapping van IATA-code naar de bijbehorende luchthavennaam
+mapping = vliegvelden_clean.set_index('IATA')['Luchthaven']
+mapping2 = vliegvelden_clean.set_index('IATA')['Stad']
+mapping3 = vliegvelden_clean.set_index('IATA')['Land']
+
+# Voeg een nieuwe kolom toe aan df door de afkorting te mappen op de juiste luchthavennaam
+df['Luchthaven'] = df['route.destinations'].map(mapping)
+df['Stad'] = df['route.destinations'].map(mapping2)
+df['Land'] = df['route.destinations'].map(mapping3)
+#landen per continent bedankt chatGPT
+continenten = {
+    "Afrika": [
+        "Algerije", "Angola", "Benin", "Botswana", "Burkina Faso", "Burundi", "Comoren", "Congo-Brazzaville",
+        "Congo-Kinshasa", "Djibouti", "Egypte", "Eritrea", "Eswatini", "Ethiopië", "Gabon", "Gambia", "Ghana",
+        "Guinee", "Guinee-Bissau", "Ivoorkust", "Kaapverdië", "Kameroen", "Kenia", "Lesotho", "Liberia", "Libië",
+        "Madagaskar", "Malawi", "Mali", "Marokko", "Mauritanië", "Mauritius", "Mozambique", "Namibië", "Niger",
+        "Nigeria", "Oeganda", "Rwanda", "Sao Tomé en Principe", "Senegal", "Seychellen", "Sierra Leone",
+        "Soedan", "Somalië", "Tanzania", "Togo", "Tsjaad", "Tunesië", "Zambia", "Zimbabwe", "Zuid-Afrika",
+        "Zuid-Soedan"
+    ],
+    "Azië": [
+        "Afghanistan", "Armenië", "Azerbeidzjan", "Bahrein", "Bangladesh", "Bhutan", "Brunei", "Cambodja",
+        "China", "Cyprus", "Filipijnen", "Georgië", "India", "Indonesië", "Irak", "Iran", "Israël", "Japan",
+        "Jemen", "Jordanië", "Kazachstan", "Kirgizië", "Koeweit", "Laos", "Libanon", "Maldiven", "Maleisië",
+        "Mongolië", "Myanmar", "Nepal", "Noord-Korea", "Oezbekistan", "Oman", "Pakistan", "Qatar", "Rusland",
+        "Saoedi-Arabië", "Singapore", "Sri Lanka", "Syrië", "Tadzjikistan", "Taiwan", "Thailand", "Turkije",
+        "Turkmenistan", "Verenigde Arabische Emiraten", "Vietnam", "Zuid-Korea"
+    ],
+    "Europa": [
+        "Albanië", "Andorra", "België", "Bosnië en Herzegovina", "Bulgarije", "Denemarken", "Duitsland",
+        "Estland", "Finland", "Frankrijk", "Griekenland", "Hongarije", "Ierland", "IJsland", "Italië", "Kosovo",
+        "Kroatië", "Letland", "Liechtenstein", "Litouwen", "Luxemburg", "Malta", "Moldavië", "Monaco",
+        "Montenegro", "Nederland", "Noord-Macedonië", "Noorwegen", "Oekraïne", "Oostenrijk", "Polen", "Portugal",
+        "Roemenië", "San Marino", "Servië", "Slovenië", "Slowakije", "Spanje", "Tsjechië", "Vaticaanstad",
+        "Verenigd Koninkrijk", "Wit-Rusland", "Zweden", "Zwitserland"
+    ],
+    "Noord-Amerika": [
+        "Antigua en Barbuda", "Bahama's", "Barbados", "Belize", "Canada", "Costa Rica", "Cuba", "Dominica",
+        "Dominicaanse Republiek", "El Salvador", "Grenada", "Guatemala", "Haïti", "Honduras", "Jamaica",
+        "Mexico", "Nicaragua", "Panama", "Saint Kitts en Nevis", "Saint Lucia", "Saint Vincent en de Grenadines",
+        "Trinidad en Tobago", "Verenigde Staten"
+    ],
+    "Zuid-Amerika": [
+        "Argentinië", "Bolivia", "Brazilië", "Chili", "Colombia", "Ecuador", "Guyana", "Paraguay", "Peru",
+        "Suriname", "Uruguay", "Venezuela"
+    ],
+    "Oceanië": [
+        "Australië", "Fiji", "Kiribati", "Marshalleilanden", "Micronesia", "Nauru", "Nieuw-Zeeland", "Palau",
+        "Papoea-Nieuw-Guinea", "Samoa", "Salomonseilanden", "Tonga", "Tuvalu", "Vanuatu"
+    ]
+}
+def land_naar_continent(land):
+    for continent, landen in continenten.items():
+        if land in landen:
+            return continent
+    return "Onbekend"  # Voor landen die niet in de lijst staan
+
+# Pas de functie toe op de DataFrame
+df['Continent'] = df['Land'].apply(land_naar_continent)
+
+
+#Plotly Continenten 
+fig=go.Figure()
+
+for continent in continenten:
+    subset = df[df['Continent'] == continent]['Land']
+    fig.add_trace(go.Histogram(
+        x=subset, 
+        name=continent,  
+        visible=True if continent == 'Alle' else False  # Standaard op Afrika (pas aan indien gewenst)
+    ))
+
+
+dropdown_buttons = [ 
+    {'label': "Alle", 'method': "update", 'args': [{"visible" : [True, True, True, True, True, True]}, {"title": "Alle"}]},
+    {'label': "Afrika", 'method': "update", 'args': [{"visible": [True, False, False, False, False, False]}, {"title": "Afrika"}]},
+    {'label': "Azië", 'method': "update", 'args': [{"visible": [False, True, False, False, False, False]}, {"title": "Azië"}]},
+    {'label': "Europa", 'method': "update", 'args': [{"visible": [False, False, True, False, False, False]}, {"title": "Europa"}]},
+    {'label': "Noord-Amerika", 'method': "update", 'args': [{"visible": [False, False, False, True, False, False]}, {"title": "Noord-Amerika"}]},
+    {'label': "Zuid-Amerika", 'method': "update", 'args': [{"visible": [False, False, False, False, True, False]}, {"title": "Zuid-Amerika"}]},
+    {'label': "Oceanië", 'method': "update", 'args': [{"visible": [False, False, False, False, False, True]}, {"title": "Oceanië"}]}
+]
+checkbox = [
+    {'label': "Alle", 'method': "update", 'aggs': [{"visible": [True, True]}, {"title": "Alle"}]},
+    {'label': "Arrival", 'method': "update", 'aggs': [{"visible": [True, False]}, {"title": "Arrival"}]},
+    {'label': "Departure", 'method': "update", 'aggs': [{"visible": [False, True]}, {"title": "Departure"}]}       
+]
+
+
+
+# Voeg dropdown-menu toe aan de layout
+fig.update_layout(
+    updatemenus=[{
+        'buttons': dropdown_buttons, 
+        'direction': "down",
+        'showactive': True,
+
+        # dict('buttons'== checkbox, 
+        # 'direction': "down",
+        # 'showactive': True)
+    }],
+    title="Histogram per Continent",
+    autosize=False,
+    width=1000,
+    height=600
+)
+
+
+#sidebar knoppen
+options = st.sidebar.radio('Paginas', 
+options=['Home', 'Datastatistieken'
+         , 'Data Header', 'Data', 'Plot1',
+         'Interactive Plot', 'Continent plot'])
 
 GeoCoö = {
     "ATL": {"latitude": 33.6407, "longitude": -84.4277},
@@ -530,6 +742,9 @@ df["Continent"] = df["Land"].apply(land_naar_continent)
 df_grouped = df.groupby(["Continent", "Land"])["landingDelay"].mean().reset_index()
 
 
+# "Onbekend" verwijderen uit de dataset
+df_grouped = df_grouped[df_grouped["Continent"] != "Onbekend"]
+
 # Streamlit UI
 st.title("✈️ Histogram van Landing Delay per Continent")
 
@@ -543,25 +758,23 @@ if geselecteerd_continent == "Alle":
     for continent in df_grouped["Continent"].unique():
         subset = df_grouped[df_grouped["Continent"] == continent]
         fig.add_trace(go.Histogram(
-            y=subset["landingDelay"],  
+            x=subset["landingDelay"],
             name=continent,
-            opacity=0.75,
-            orientation="h"  
+            opacity=0.75
         ))
 else:
     subset = df_grouped[df_grouped["Continent"] == geselecteerd_continent]
     fig.add_trace(go.Histogram(
-        y=subset["landingDelay"],  
+        x=subset["landingDelay"],
         name=geselecteerd_continent,
-        opacity=0.75,
-        orientation="h"  
+        opacity=0.75
     ))
 
 # Layout aanpassen
 fig.update_layout(
     title=f"📊 Histogram van Landing Delay in {geselecteerd_continent}",
-    yaxis_title="Landing Delay (minuten)",  
-    xaxis_title="Aantal landen", 
+    xaxis_title="Landing Delay (minuten)",
+    yaxis_title="Aantal landen",
     barmode="overlay",
     legend_title="Continent",
 )
