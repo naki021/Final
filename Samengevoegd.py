@@ -143,6 +143,13 @@ def continent_plot(dataframe):
 #Invoegen van de sidebar gebeurt met deze regel
 st.sidebar.title('Verkeersleiding')
 
+#dataframe wat wij gaan gebruiken
+url = "https://api.schiphol.nl/public-flights/flights?includedelays=false&page=0&sort=%2BscheduleTime"
+headers = {
+    "app_id": "dbd8eca8",
+    "app_key": "42c284624e47e194b2600191b939ad5b",
+    'ResourceVersion': 'v4'
+}
 # Een lege lijst om alle vluchtdata op te slaan
 all_flights_data = []
 @st.cache_data(ttl=600)
@@ -164,42 +171,11 @@ def bagger():
         
         # Voeg de gegevens toe aan de lijst
         all_flights_data.extend(flights_data)
-        
-    # Definieer de API URL vóór het aanroepen van de functie bagger
-url = "https://api.schiphol.nl/public-flights/flights?includedelays=false&page={}&sort=%2BscheduleTime"
-headers = {
-    "app_id": "c93492b2",
-    "app_key": "16a5764ed747d28fc0c58196e7322a04",
-    'ResourceVersion': 'v4'
-}
-
-@st.cache_data(ttl=600)
-def bagger():
-    all_flights_data = []
-    for page in range(50):
-        page_url = url.format(page)  # Nu is url correct gedefinieerd
-        response = requests.get(page_url, headers=headers)
-
-        # Controleer of de API succesvol antwoordt
-        if response.status_code != 200:
-            st.error(f"❌ API-fout: {response.status_code}. Kan geen data ophalen.")
-            st.text(response.text)  # Toon de volledige foutmelding
-            return pd.DataFrame()  # Geef een lege dataframe terug om crashes te voorkomen
-
-        try:
-            data = response.json()  # Verkrijg de JSON-reactie
-        except requests.exceptions.JSONDecodeError:
-            st.error("❌ De API heeft geen geldige JSON teruggegeven.")
-            st.text(response.text)  # Toon de ongeldige response voor debugging
-            return pd.DataFrame()  # Geef een lege dataframe terug
-
-        flights_data = data.get('flights', [])
-        all_flights_data.extend(flights_data)
-
-    return pd.json_normalize(all_flights_data)  # Zet alle vluchtgegevens om naar een DataFrame
-
+       
+df= bagger()  
 # Normaliseer de vluchtgegevens naar een DataFrame
 df = pd.json_normalize(all_flights_data)
+
 
 
 df.to_csv("Schiphol.csv", index=False, decimal=',')
@@ -609,31 +585,15 @@ headers = {
 # Een lege lijst om alle vluchtdata op te slaan
 all_flights_data = []
 
-@st.cache_data(ttl=600)
-def fetch_flight_data(pages=10):
-    all_flights_data = []
-    for page in range(pages):
-        page_url = url.format(page)  
-        response = requests.get(page_url, headers=headers)
-
-        # Controleer of de API succesvol antwoordt
-        if response.status_code != 200:
-            st.error(f"❌ API-fout: {response.status_code}. Kan geen data ophalen.")
-            st.text(response.text)  # Toon de volledige foutmelding
-            return pd.DataFrame()  # ✅ Nu correct binnen een functie
-
-        try:
-            data = response.json()  # Verkrijg de JSON-reactie
-        except requests.exceptions.JSONDecodeError:
-            st.error("❌ De API heeft geen geldige JSON teruggegeven.")
-            st.text(response.text)  # Toon de ongeldige response voor debugging
-            return pd.DataFrame()  # ✅ Nu correct binnen een functie
-
-        flights_data = data.get('flights', [])
-        all_flights_data.extend(flights_data)
-
-    return pd.json_normalize(all_flights_data)  # Zet alle vluchtgegevens om naar een DataFrame
-
+# Loop over de pagina's (0 tot 29, dus 30 pagina's)
+for page in range(50):
+    # Stel de volledige URL samen met de pagina
+    page_url = url.format(page)
+    
+    # Haal de gegevens op van de API
+    response = requests.get(page_url, headers=headers)
+    data = response.json()  # Verkrijg de JSON reactie
+    
     # Haal de 'flights' lijst op uit de response
     flights_data = data.get('flights', [])
     
@@ -863,3 +823,4 @@ for index, row in df.iterrows():
 
 # 🚀 Weergave in Streamlit
 st_folium(m, width=600, height=400)
+
