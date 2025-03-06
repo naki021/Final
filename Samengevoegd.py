@@ -609,26 +609,30 @@ headers = {
 # Een lege lijst om alle vluchtdata op te slaan
 all_flights_data = []
 
-# Loop over de pagina's (0 tot 29, dus 30 pagina's)
-for page in range(50):
-    # Stel de volledige URL samen met de pagina
-    page_url = url.format(page)
-    
-    # Haal de gegevens op van de API
-    response = requests.get(page_url, headers=headers)
+@st.cache_data(ttl=600)
+def fetch_flight_data(pages=10):
+    all_flights_data = []
+    for page in range(pages):
+        page_url = url.format(page)  
+        response = requests.get(page_url, headers=headers)
 
-# Controleer of de API succesvol antwoordt
-if response.status_code != 200:
-    st.error(f"❌ API-fout: {response.status_code}. Kan geen data ophalen.")
-    st.text(response.text)  # Toon de volledige foutmelding
-    return pd.DataFrame()  # Geef een lege dataframe terug om crashes te voorkomen
+        # Controleer of de API succesvol antwoordt
+        if response.status_code != 200:
+            st.error(f"❌ API-fout: {response.status_code}. Kan geen data ophalen.")
+            st.text(response.text)  # Toon de volledige foutmelding
+            return pd.DataFrame()  # ✅ Nu correct binnen een functie
 
-try:
-    data = response.json()  # Verkrijg de JSON-reactie
-except requests.exceptions.JSONDecodeError:
-    st.error("❌ De API heeft geen geldige JSON teruggegeven.")
-    st.text(response.text)  # Toon de ongeldige response voor debugging
-    return pd.DataFrame()  # Geef een lege dataframe terug
+        try:
+            data = response.json()  # Verkrijg de JSON-reactie
+        except requests.exceptions.JSONDecodeError:
+            st.error("❌ De API heeft geen geldige JSON teruggegeven.")
+            st.text(response.text)  # Toon de ongeldige response voor debugging
+            return pd.DataFrame()  # ✅ Nu correct binnen een functie
+
+        flights_data = data.get('flights', [])
+        all_flights_data.extend(flights_data)
+
+    return pd.json_normalize(all_flights_data)  # Zet alle vluchtgegevens om naar een DataFrame
 
     # Haal de 'flights' lijst op uit de response
     flights_data = data.get('flights', [])
@@ -859,4 +863,3 @@ for index, row in df.iterrows():
 
 # 🚀 Weergave in Streamlit
 st_folium(m, width=600, height=400)
-
