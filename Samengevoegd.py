@@ -604,7 +604,7 @@ for page in range(50):
     page_url = url.format(page)
     
     # Haal de gegevens op van de API
-    response = requests.get(page_url, headers=headers
+    response = requests.get(page_url, headers=headers)
 
 # Controleer of de API succesvol antwoordt
 if response.status_code != 200:
