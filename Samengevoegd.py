@@ -165,8 +165,28 @@ def bagger():
         
         # Voeg de gegevens toe aan de lijst
         all_flights_data.extend(flights_data)
-       
+        
+    # Definieer de API URL vóór het aanroepen van de functie bagger
+url = "https://api.schiphol.nl/public-flights/flights?includedelays=false&page={}&sort=%2BscheduleTime"
+headers = {
+    "app_id": "c93492b2",
+    "app_key": "16a5764ed747d28fc0c58196e7322a04",
+    'ResourceVersion': 'v4'
+}
+
+@st.cache_data(ttl=600)
+def bagger():
+    all_flights_data = []
+    for page in range(50):
+        page_url = url.format(page)  # Nu is url correct gedefinieerd
+        response = requests.get(page_url, headers=headers)
+        data = response.json()
+        flights_data = data.get('flights', [])
+        all_flights_data.extend(flights_data)
+    return pd.json_normalize(all_flights_data)
+   
 df= bagger()  
+
 # Normaliseer de vluchtgegevens naar een DataFrame
 df = pd.json_normalize(all_flights_data)
 
