@@ -180,12 +180,24 @@ def bagger():
     for page in range(50):
         page_url = url.format(page)  # Nu is url correct gedefinieerd
         response = requests.get(page_url, headers=headers)
-        data = response.json()
+
+        # Controleer of de API succesvol antwoordt
+        if response.status_code != 200:
+            st.error(f"❌ API-fout: {response.status_code}. Kan geen data ophalen.")
+            st.text(response.text)  # Toon de volledige foutmelding
+            return pd.DataFrame()  # Geef een lege dataframe terug om crashes te voorkomen
+
+        try:
+            data = response.json()  # Verkrijg de JSON-reactie
+        except requests.exceptions.JSONDecodeError:
+            st.error("❌ De API heeft geen geldige JSON teruggegeven.")
+            st.text(response.text)  # Toon de ongeldige response voor debugging
+            return pd.DataFrame()  # Geef een lege dataframe terug
+
         flights_data = data.get('flights', [])
         all_flights_data.extend(flights_data)
-    return pd.json_normalize(all_flights_data)
-   
-df= bagger()  
+
+    return pd.json_normalize(all_flights_data)  # Zet alle vluchtgegevens om naar een DataFrame
 
 # Normaliseer de vluchtgegevens naar een DataFrame
 df = pd.json_normalize(all_flights_data)
