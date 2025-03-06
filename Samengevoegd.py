@@ -604,9 +604,21 @@ for page in range(50):
     page_url = url.format(page)
     
     # Haal de gegevens op van de API
-    response = requests.get(page_url, headers=headers)
-    data = response.json()  # Verkrijg de JSON reactie
-    
+    response = requests.get(page_url, headers=headers
+
+# Controleer of de API succesvol antwoordt
+if response.status_code != 200:
+    st.error(f"❌ API-fout: {response.status_code}. Kan geen data ophalen.")
+    st.text(response.text)  # Toon de volledige foutmelding
+    return pd.DataFrame()  # Geef een lege dataframe terug om crashes te voorkomen
+
+try:
+    data = response.json()  # Verkrijg de JSON-reactie
+except requests.exceptions.JSONDecodeError:
+    st.error("❌ De API heeft geen geldige JSON teruggegeven.")
+    st.text(response.text)  # Toon de ongeldige response voor debugging
+    return pd.DataFrame()  # Geef een lege dataframe terug
+
     # Haal de 'flights' lijst op uit de response
     flights_data = data.get('flights', [])
     
